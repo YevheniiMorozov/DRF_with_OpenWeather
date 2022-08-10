@@ -51,23 +51,12 @@ class ModelTestCase(BasicTestCase):
 
 class ViewTestCase(BasicTestCase):
 
-    def test_login_and_authorization(self):
+    def test_register(self):
         response = self.client.post(reverse("register"), {"username": "user1",
                                                           "email": "321@123.com",
                                                           "password": "password1"}, follow=True)
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data, {"username": "user1", "email": "321@123.com"})
-
-        response = self.client.get(reverse('rest_framework:login'))
-        self.assertEqual(response.status_code, 200)
-
-        response = self.client.post(reverse('rest_framework:login'), {"username": "user1", "password": "password1"},
-                                    follow=True)
-        # 404 cause it try to redirect user profile page and it does not exist
-        self.assertEqual(response.status_code, 404)
-
-        response = self.client.get(reverse('rest_framework:logout'), follow=True)
-        self.assertEqual(response.status_code, 200)
 
     def test_subscription(self):
         self.client.force_login(user=self.user)

@@ -23,6 +23,7 @@ class Weather(models.Model):
     feels_like = models.FloatField()
     weather_description = models.CharField(max_length=100)
     src_img = models.CharField(max_length=150)
+    date_create = models.DateTimeField(auto_now_add=True, null=True)
 
     class Meta:
         ordering = ["-id"]

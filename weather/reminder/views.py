@@ -42,49 +42,19 @@ class UserSubscribeAPIView(APIView):
         return response.Response({f"{request.user.email}": serializer.data}, status=status.HTTP_200_OK)
 
     def post(self, request):
-        city_name = request.data["city"] if request.data else None
-        notification = request.data["notification"] if request.data else None
-        if not (city_name and notification):
-            return response.Response("Add 'city' and 'notification' to create sub", status=status.HTTP_400_BAD_REQUEST)
-        try:
-            tr.String().check(city_name)
-        except tr.DataError:
-            return response.Response("'city' must be a string", status=status.HTTP_400_BAD_REQUEST)
-        try:
-            tr.Int().check(notification)
-        except tr.DataError:
-            return response.Response("'notification' must be an integer", status=status.HTTP_400_BAD_REQUEST)
-        if City.objects.filter(name=city_name).exists():
-            city = City.objects.get(name=city_name)
-        else:
-            city = City.objects.create(name=city_name)
-        if Subscribe.objects.filter(user=request.user, city=city).exists():
-            return response.Response("Notification is already exists", status=status.HTTP_204_NO_CONTENT)
-        new_sub = Subscribe.objects.create(
-            user=request.user, city=city, notification=notification
-        )
-        new_sub.save()
-        serializer = SubscribeSerializer(new_sub)
-        return response.Response(serializer.data, status=status.HTTP_201_CREATED)
+        serializer = SubscribeSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return response.Response(serializer.data, status=status.HTTP_201_CREATED)
+        return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request):
-        notification = request.data['notification']
-        city_name = request.data["city"]
-        try:
-            tr.String().check(city_name)
-        except tr.DataError:
-            return response.Response("'city' must be a string", status=status.HTTP_400_BAD_REQUEST)
-        try:
-            tr.Int().check(notification)
-        except tr.DataError:
-            return response.Response("'notification' must be an integer", status=status.HTTP_400_BAD_REQUEST)
-        if not Subscribe.objects.filter(city__name=city_name).exists():
-            return response.Response("This sub doesn`t exists", status=status.HTTP_400_BAD_REQUEST)
-        sub = Subscribe.objects.filter(user=request.user, city__name=city_name).first()
-        sub.notification = notification
-        sub.save()
-        serializer = SubscribeSerializer(sub)
-        return response.Response(serializer.data, status=status.HTTP_200_OK)
+        instance = Subscribe.objects.get(user=request.user)
+        serializer = SubscribeSerializer(instance, data=request.data, context={"request": request})
+        if serializer.is_valid():
+            serializer.save()
+            return response.Response(serializer.data, status=status.HTTP_200_OK)
+        return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request):
         city_name = request.data["city"]
@@ -109,7 +79,6 @@ class WeatherAPIView(APIView):
         if City.objects.filter(name=city_name).exists():
             weather_in_city = Weather.objects.filter(city__name=city_name).first()
             serializer = WeatherSerializer(weather_in_city)
-            print(serializer.data)
             return response.Response(data=serializer.data, status=status.HTTP_200_OK)
         return response.Response("City does not exists, but you can add it", status=status.HTTP_404_NOT_FOUND)
 

@@ -1,0 +1,6 @@
+__pycache__/
+weather/.env
+weather/.coverage
+pytest_cache/
+venv
+.idea

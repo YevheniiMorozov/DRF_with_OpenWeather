@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from .models import City, Subscribe, WeatherUser, Weather
 
+
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(max_length=20, min_length=8, write_only=True)
 

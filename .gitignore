@@ -1,5 +1,6 @@
 __pycache__/
 weather/.env
+weather/.env.dev
 weather/.coverage
 pytest_cache/
 venv

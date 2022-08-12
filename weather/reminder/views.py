@@ -19,8 +19,11 @@ def get_weather(city):
     return None
 
 
-class RegisterAPIView(GenericAPIView):
+from .tasks import send_email_create_task, send_email_delete_task, send_email_edit_task, delete_weather_task, \
+    update_weather_task
 
+
+class RegisterAPIView(GenericAPIView):
     permission_classes = [AllowAny]
     serializer_class = UserSerializer
 
@@ -45,6 +48,7 @@ class UserSubscribeAPIView(APIView):
         serializer = SubscribeSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
+            send_email_create_task(request)
             return response.Response(serializer.data, status=status.HTTP_201_CREATED)
         return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -53,6 +57,7 @@ class UserSubscribeAPIView(APIView):
         serializer = SubscribeSerializer(instance, data=request.data, context={"request": request})
         if serializer.is_valid():
             serializer.save()
+            send_email_edit_task(request)
             return response.Response(serializer.data, status=status.HTTP_200_OK)
         return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -65,9 +70,10 @@ class UserSubscribeAPIView(APIView):
         if not City.objects.filter(name=city_name).exists():
             return response.Response("City does not exists", status=status.HTTP_404_NOT_FOUND)
         Subscribe.objects.filter(user=request.user, city__name=city_name).delete()
+        send_email_delete_task(request)
         if not Subscribe.objects.filter(city__name=city_name).exists():
-            Weather.objects.filter(city__name=city_name).all().delete()
             City.objects.filter(name=city_name).delete()
+            delete_weather_task(city_name)
         return response.Response("Deleted", status=status.HTTP_200_OK)
 
 
@@ -97,5 +103,6 @@ class WeatherAPIView(APIView):
                 src_img=f"http://openweathermap.org/img/wn/{data['weather'][0]['icon']}@2x.png"
             )
             serializer = WeatherSerializer(weather_city)
+            update_weather_task(city_name)
             return response.Response(data=serializer.data, status=status.HTTP_201_CREATED)
         return response.Response("Invalid data, try again", status=status.HTTP_400_BAD_REQUEST)

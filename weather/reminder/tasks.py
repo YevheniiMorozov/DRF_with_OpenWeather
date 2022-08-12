@@ -65,7 +65,7 @@ def delete_weather_task(city):
 def send_email_create_task(request):
     city = request.data.get('city')
     user = request.user
-    sub = Subscribe.objects.get(city__name=city, user=user)
+    sub = Subscribe.objects.filter(city__name=city, user=user).first()
     schedule, created = IntervalSchedule.objects.get_or_create(every=sub.notification, period=IntervalSchedule.HOURS)
     task = PeriodicTask.objects.create(
         name=f'send weather in {city} to {user.email}',

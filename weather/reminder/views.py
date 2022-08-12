@@ -53,7 +53,7 @@ class UserSubscribeAPIView(APIView):
         return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request):
-        instance = Subscribe.objects.get(user=request.user)
+        instance = Subscribe.objects.get(user=request.user, city__name=request.data.get("city"))
         serializer = SubscribeSerializer(instance, data=request.data, context={"request": request})
         if serializer.is_valid():
             serializer.save()

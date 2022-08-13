@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MaxValueValidator
@@ -15,6 +17,7 @@ class Subscribe(models.Model):
     user = models.ForeignKey(WeatherUser, on_delete=models.CASCADE)
     city = models.ForeignKey(City, on_delete=models.CASCADE)
     notification = models.PositiveIntegerField(default=2, validators=[MaxValueValidator(24)])
+    last_sent_time = models.DateTimeField(default=datetime.now, null=True)
 
 
 class Weather(models.Model):

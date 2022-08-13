@@ -17,6 +17,8 @@ from decouple import config
 
 from datetime import timedelta
 
+from celery.schedules import crontab
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -183,4 +185,15 @@ CELERY_BROKER_URL = 'redis://localhost:6379'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
-CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+CELERY_ENABLE_UTC = True
+CELERY_BEAT_SCHEDULE = {
+    'send_mail': {
+        'task': 'reminder.tasks.send_mail',
+        'schedule': crontab(hour='6-21', minute=0),
+    },
+    'update_weather': {
+        'task': 'reminder.tasks.update_weather',
+        'schedule': crontab(minute=0, hour='*/1'),
+    }
+}
+# CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'

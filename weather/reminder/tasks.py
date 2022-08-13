@@ -1,94 +1,73 @@
-import json
+from datetime import datetime, timedelta
 
 from celery import shared_task
+
 from decouple import config
 
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
-from django.utils import timezone
-from django_celery_beat.models import PeriodicTask, IntervalSchedule
-
-
 from .views import get_weather
-from .models import Subscribe, Weather
+from .models import Subscribe, Weather, City
+from collections import defaultdict
 
 
-@shared_task(name="update_weather")
-def update_weather(city):
-    data = get_weather(city)
-    Weather.objects.filter(city__name=city).update(
-        temperature=data['main']["temp"],
-        feels_like=data['main']["feels_like"],
-        weather_description=data['weather'][0]["description"],
-        src_img=f"http://openweathermap.org/img/wn/{data['weather'][0]['icon']}@2x.png"
-    )
+# python -m celery -A weather worker
 
 
-@shared_task(name="send_mail")
-def send_mail(sub_id):
-    sub = Subscribe.objects.get(id=sub_id)
-    weather = Weather.objects.get(city=sub.city)
-    mail_body = f'''
-    <strong>{weather.city}</strong><br>
-    Temperature: {weather.temperature}<br>
-    Feels like: {weather.feels_like}<br>
-    Description: {weather.weather_description}<br'''
-
-    send_grid = SendGridAPIClient(config("SENDGRID_API_KEY"))
-    message = Mail(
-        from_email="gml.for.a.work@gmail.com",
-        to_emails=sub.user.email,
-        subject="Notification weather in cities",
-        html_content=mail_body
-    )
-    send_grid.send(message)
+@shared_task
+def update_weather():
+    cities = [city for city in City.objects.all()]
+    weather = []
+    for city in cities:
+        data = get_weather(city.name)
+        weather.append(Weather(
+            city=city,
+            temperature=data['main']["temp"],
+            feels_like=data['main']["feels_like"],
+            weather_description=data['weather'][0]["description"],
+            src_img=f"http://openweathermap.org/img/wn/{data['weather'][0]['icon']}@2x.png"
+        ))
+    Weather.objects.bulk_create(weather)
+    print("updated")
 
 
-def update_weather_task(city):
-    schedule, created = IntervalSchedule.objects.get_or_create(every=1, period=IntervalSchedule.HOURS)
-    task = PeriodicTask.objects.create(
-        name=f"update weather in {city}",
-        task="update_weather",
-        interval=schedule,
-        args=json.dumps([city]),
-        start_time=timezone.now()
-    )
-    task.save()
+@shared_task
+def send_mail():
+    start = 0
+    for elements in range(start+1, Subscribe.objects.count(), 100):
+        subs = [(sub.user.email, sub.city.name, sub.notification, sub.last_sent_time)
+                for sub in Subscribe.objects.select_related("user", "city").extra(where=[
+                f"user__id > '{start}', user__id <= '{elements + start}'"
+            ])]
+        start += 100
 
+        weather = {weather.city.name: weather for weather in Weather.objects.select_related("city").all()}
 
-def delete_weather_task(city):
-    task = PeriodicTask.objects.get(name=f"update weather in {city}")
-    task.delete()
+        sub_dict = defaultdict(list)
+        for email, city, notification, last_sent in subs:
+            sub_dict[email].append((weather[city], notification, last_sent))
 
+        for email, info in sub_dict.items():
+            mail_body = ''
+            for weather, notification, last_sent in info:
+                if last_sent + timedelta(hours=notification) < datetime.now():
+                    continue
+                mail_body += f'''<br>
+                <strong>{weather.city}</strong><br>
+                Temperature: {weather.temperature}<br>
+                Feels like: {weather.feels_like}<br>
+                Description: {weather.weather_description}<br'''
+                Weather.objects.filter(user__email=email, city__name=weather.city).update(
+                    last_sent=datetime.now()
+                )
 
-def send_email_create_task(request):
-    city = request.data.get('city')
-    user = request.user
-    sub = Subscribe.objects.filter(city__name=city, user=user).first()
-    schedule, created = IntervalSchedule.objects.get_or_create(every=sub.notification, period=IntervalSchedule.HOURS)
-    task = PeriodicTask.objects.create(
-        name=f'send weather in {city} to {user.email}',
-        task='send_mail',
-        interval=schedule,
-        args=json.dumps([sub.id]),
-        start_time=timezone.now()
-    )
-    task.save()
-
-
-def send_email_edit_task(request):
-    city = request.data.get('city')
-    user = request.user
-    notification = request.data.get('notification')
-    task = PeriodicTask.objects.get(name=f'send weather in {city} to {user.email}')
-    task.interval.every = notification
-    task.interval.save()
-    task.save()
-
-
-def send_email_delete_task(request):
-    city = request.data.get('city')
-    user = request.user
-    task = PeriodicTask.objects.get(name=f'send weather in {city} to {user.email}')
-    task.delete()
+            send_grid = SendGridAPIClient(config("SENDGRID_API_KEY"))
+            message = Mail(
+                from_email="gml.for.a.work@gmail.com",
+                to_emails=email,
+                subject="Notification weather in cities",
+                html_content=mail_body
+            )
+            send_grid.send(message)
+            print("Mail sending: ", mail_body)

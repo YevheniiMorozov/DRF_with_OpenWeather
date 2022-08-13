@@ -24,3 +24,21 @@ services:
     image: redis
     ports:
       - "6379:6379"
+  celery:
+    build: .
+    command: celery -A weather worker -l INFO
+    volumes:
+      - .:/code/weather/
+    depends_on:
+      - web
+      - redis
+  celery-beat:
+    build: .
+    command: celery -A weather beat -l INFO
+    volumes:
+       - .:/code/weather/
+    depends_on:
+      - redis
+      - web
+volumes:
+  postgres_data:

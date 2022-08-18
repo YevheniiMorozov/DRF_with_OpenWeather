@@ -15,7 +15,7 @@ services:
     volumes:
       - .:/code
     env_file:
-      - .env.dev
+      - .env.example.dev
     ports:
       - "8000:8000"
     depends_on:

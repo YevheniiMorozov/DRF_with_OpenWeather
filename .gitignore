@@ -1,5 +1,5 @@
 __pycache__/
-weather/.env
+weather/.env.example
 weather/.env.dev
 weather/.coverage
 pytest_cache/

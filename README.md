@@ -1,2 +1,1 @@
-# Task-17
-
+Training project wit DRF
